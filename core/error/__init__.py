@@ -1,0 +1,1 @@
+# TODO we should define base-level exceptions/codes here, and allow for extension/addition
