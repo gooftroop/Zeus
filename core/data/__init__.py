@@ -1,0 +1,1 @@
+# import all classes in local files so they are accessible as core.data.*
