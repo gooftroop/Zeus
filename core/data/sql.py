@@ -35,30 +35,167 @@ CONNECTION_URI_DELIM = ":///"
 
 class Model(DAO):
 	"""
+	Wrapper object to adapt data source model for use with a Transactor
 	"""
 
-	def __init__(self, table, engine):
+	def __init__(self, table):
 
 		if not table:
 			raise IllegalArgumentException("Table is required")
 
-		if not engine:
-			raise IllegalArgumentException("Engine is required")
-
 		super(SQL, self).__init__(self)
-		self.Session = None
-		self._table = table
-		self._session_factory = sessionmaker(bind=self._engine, autoflush=autoflush)
+		self.table = table
+		self._session = None
+
+	###########################################################################
+	# Instance functionality
+	# 
+	# The following methods provide an interface/proxy to the current Session
+	###########################################################################
+	
+	def destroy(self):
+		this.unbind()
+		# TODO Any additional cleanup on the table? Drop the table from the session?
+
+	def to_string(self):
+		# Hmmmm.....
+		pass
+
+	###########################################################################
+	# Data Access APIs
+	###########################################################################
+	
+	# TODO use the current bind(session) schema, or require that session be passed in?
+	def get(self, name, **kwargs):
+		# Gets a row from the table
+		# TODO 
+		# - if name is not specified - don't error out => just don't use .get()
+		# - allow distinct?
+		# - one_or_none?
+		# - first?
+		# - as_scalar (or scalar)?
+		# - order_by?
+		if not name:
+			raise IllegalArgumentException("'name' is required. Name is the identifier (or primary key) of the row to" +
+										   "retrieve")
+
+	def create(self, name, **kwargs):
+		# Creates a new row
+		# This...I'm strugglebus with. Session doesn't actually expose a way to 
+		# insert into a table. We can use .add, but since our Tables are generated
+		# dynamically, this proves to be difficult (maybe impossible). Accessing
+		# Table might work, but the API is not particularly clear
+		if not name:
+			raise IllegalArgumentException("'name' is required. Name is the identifier (or primary key) of the row to" +
+										   "create")
+
+	def update(self, name, values, **kwargs):
+		# Updates a new row with the specified content
+		# TODO 
+		# - if name is not specified - don't error out => just don't use .get()
+		if not name:
+			raise IllegalArgumentException("'name' is required. Name is the identifier (or primary key) of the row to" +
+										   "update")
+
+		if not values:
+			raise IllegalArgumentException("'values' are required")
+
+		_sync_stratey = kwargs.pop("synchronize_session", "evaluate")
+		_update_args = kwargs.pop("update_args", None)
+
+		self.session.query(self).get(name)
+			.filter_by(kwargs)
+			.update(values, synchronize_session=_sync_stratey, update_args=_update_args)
+
+	def replace(self, name, values, **kwargs):
+		# Replace is semantically no different than update in SQLAlchemy
+		self.update(name, values, **kwargs)
+
+	def delete(self, name, **kwargs):
+		# Deletes rows matched by a query
+		# TODO 
+		# - if name is not specified - don't error out => just don't use .get()
+		if not name:
+			raise IllegalArgumentException("'name' is required. Name is the identifier (or primary key) of the row to" +
+										   "either have information removed from or deleted")
+
+		_sync_stratey = kwargs.pop("synchronize_session", "evaluate")
+		self.session.query(self).get(name)
+			.filter_by(kwargs)
+			.delete(synchronize_session=_sync_stratey)
+
+	# Special case?
+	def expand(self):
+		# Adds a new column to this table
+		# args:
+		pass
+
+	def contrain(self):
+		# Adds a new constraint to this table
+		# args:
+		pass
+
+	def join(self):
+		# Performs the specified join
+		# args:
+		pass
+
+	###########################################################################
+	# Data Set operations
+	###########################################################################
+	
+	# If operations are being done on the same Table, then do nothing
+	# If operations are being done against other Tables, then perform joins
+	# Otherwise, then use union, intersection, etc.
+	def add(self, other):
+		pass 
+
+	def sub(self, other):
+		pass 
+
+	def mul(self, other):
+		pass 
+
+	def div(self, other):
+		pass 
+
+	def AND(self, other):
+		pass 
+
+	def OR(self, other):
+		pass 
+
+	def XOR(self, other):
+		pass
+
+	def invert(self, other):
+		# Complement
+		pass
+
+	###########################################################################
+	# Container operations
+	###########################################################################
+	
+	def size(self):
+		pass
+
+	def contains(self, key):
+		pass
+
+	def reversed(self):
+		pass
+
+	def defaults(self, key):
+		pass
+
+	def iterator(self):
+		pass
 
 
-class SQL(object):
+class SQL(Transactor):
 	"""
 	"""
 
-	# We need database url
-	# allow to get table?
-	# ok, so we can do this two ways --> either its a sql.py instance per table, 
-	# or we allow access via getters/setters with the additional parameter of table
 	def __init__(self, dbtype="mysql", connection_uri=None, logging=True, autoflush=True):
 		"""
 		"""
@@ -67,45 +204,128 @@ class SQL(object):
 			raise IllegalArgumentException("The database connection URI is required")
 
 		super(SQL, self).__init__(self)
-		
+
 		self._connection_uri = connection_uri
 		self._dbtype = dbtype
 		self._engine = create_engine(dbtype + CONNECTION_URI_DELIM + connection_uri, echo=logging)
 		self._meta = MetaData()
 
-		self._meta.reflect(bind=self._engine)
-		for name, table in self._meta.tables:
-			self._models[name] = Model(table, self._engine)
-
-	def __getattr__(self, name):
-		try:
-			return self._models[name]
-		except KeyError:
-			msg = "'{0}' object has no attribute '{1}'"
-        	raise AttributeError(msg.format(type(self).__name__, name))
-
-    def __setattr__(self, name, value):
-    	self.new(name, value)
-
-    def __delattr__(self, name):
-    	self.delete(name)
-
+		self.refresh()
 
 	###########################################################################
-	# RDM Specific functionality
+	# SQLAlchemy Specific functionality
 	###########################################################################
 	
-	def listen(target, event, callback):
-		event.listen(target, event, callback)
-	
+	def on(target, event, callback, retval=False):
+		if not target:
+			raise IllegalArgumentException("'target' is requried")
 
+		if not event:
+			raise IllegalArgumentException("'event' is requried")
+
+		if not callback:
+			raise IllegalArgumentException("'callback' is requried")
+
+		event.listen(target, event, callback, retval=retval)
+
+	def off(target, event, callback):
+		if not target:
+			raise IllegalArgumentException("'target' is requried")
+
+		if not event:
+			raise IllegalArgumentException("'event' is requried")
+
+		if not callback:
+			raise IllegalArgumentException("'callback' is requried")
+
+		event.remove(targe, event, callback)
+
+	def registered(target, event, callback):
+		if not target:
+			raise IllegalArgumentException("'target' is requried")
+
+		if not event:
+			raise IllegalArgumentException("'event' is requried")
+
+		if not callback:
+			raise IllegalArgumentException("'callback' is requried")
+
+		event.remove(targe, event, callback)
+	
 	###########################################################################
 	# Override Object behavior
 	###########################################################################
 
 	def new(self, name, value):
+		# Create new Table
 		pass
 
 	def delete(self, name):
+		# Delete Table
 		pass
+
+	def destroy(self):
+		# Clean up self
+		self.close()
+
+	def to_string(self):
+		return "SQL Transactor {0}".format(self.model_names())
+
+	def refresh(self, schema=None, views=False, only=None, extend_existing=False, 
+				autoload_replace=True, **dialect_kwargs):
+
+		self._meta.reflect(bind=self._engine, schema=schema, views=views, only=only, 
+						   extend_existing=extend_existing, autoload_replace=autoload_replace, 
+						   **dialect_kwargs)
+
+		for name, table in self._meta.tables:
+			if not hasattr(self._models, name):
+				self._models[name] = Model(table, self._engine)
+
+	# TODO Question - right now we expose (the) Session object. To use it, 
+	# actors must know about SQLAlchemy's API for the Session. Is there value
+	# in consolidating the Session API into this API?
+
+	###########################################################################
+	# Transactional API
+	###########################################################################
+
+	def close(self):
+		if self._session:
+			self._session.close()
+			self._session = None
+
+	def invalidate(self):
+		# Useful for calls in except statements
+		if self._session:
+			self._session.invalidate()
+
+	def begin(self):
+		return (self._session = self._session_factory()) if not self._session else self._session
+
+	def tag(self):
+		if not self._session:
+			raise IllegalStateException("No Session to tag. You must begin a Session prior to tagging (creating a save point)")
+		return self._session.begin_nested()
+
+	def commit(self):
+		if not self._session:
+			raise IllegalStateException("No Session to commit. You must begin a Session prior to committing")
+		self._session.commit()
+
+	def flush(self):
+		if not self._session:
+			raise IllegalStateException("No Session to commit. You must begin a Session prior to flushing")
+		self._session.flush()
+
+	def cancel(self):
+		if not self._session:
+			raise IllegalStateException("No Session to commit. You must begin a Session prior to cancelling")
+		self._session.cancel()
+
+	def rollback(self):
+		if not self._session:
+			raise IllegalStateException("No Session to rollback. You must begin a Session prior to rolling back one")
+		self._session.rollback()
+
 	

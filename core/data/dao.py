@@ -9,40 +9,67 @@
 from exceptions import (IllegalStateException, IllegalArgumentException) # TODO implement these
 
 
-class DAO(object):
+class Transactor(object):
 	"""
 	"""
 
 	def __init__(self):
-		"""
-		"""
-
 		self._models = {}
+		self._session = None
 
 	###########################################################################
-	# Instance functionality
+	# Primary Transactor Methods
 	###########################################################################
-	
+
+	def new(self, name, value):
+		pass
+
+	def delete(self, name):
+		pass
+
 	def destroy(self):
 		pass
 
 	def to_string(self):
 		pass
 
+	def session(self):
+		pass
+
+	def refresh(self):
+		pass
+
 	def model_names(self):
 		return self._models.keys()
+
+	# TODO should we care about multi session for a transactor? How do we want
+	# to work with 'unit of work'? If we want to do multi session, then the
+	# Transactional API methods will not work
+	def session(self):
+		"""
+		Entry point for this Transactor. All operations done on a Model should
+		be done in the scope of this method. 
+
+		with db.session() as s:
+        	db.Users.get("admin")
+		"""
+		self._session = self.begin()
+		try:
+			yield self._session
+			self._session.commit()
+		except:
+			self._session.rollback()
+			raise
+		finally:
+			self.close()
 
 	@property	
 	def models(self):
 		return self._models
 
 	###########################################################################
-	# Transactional API
+	# Session API
 	###########################################################################
-	
-	def new(self):
-		# create a new model (i.e. Table, etc.)
-		pass
 
 	def close(self):
 		pass
@@ -66,6 +93,62 @@ class DAO(object):
 		pass
 
 	###########################################################################
+	# Private Methods
+	###########################################################################
+	
+	# __del__ is called when the instance is about to be destroyed.
+	# This method should be responsible for safe cleanup
+	def __del__(self):
+		self.destroy()
+
+	# Custom defined human-readable string description of this object
+	# Implementing this method is optional
+	def __str__(self):
+		self.to_string()
+
+	def __getattr__(self, name):
+		try:
+			model = self._models[name]
+			model.bind(self._session)
+			yield model
+			model.unbind()
+		except KeyError:
+			msg = "'{0}' object has no attribute '{1}'"
+        	raise AttributeError(msg.format(type(self).__name__, name))
+
+    def __setattr__(self, name, value):
+    	self.new(name, value)
+
+    def __delattr__(self, name):
+    	self.delete(name)
+
+
+class DAO(object):
+	"""
+	"""
+
+	def __init__(self):
+		pass
+
+	###########################################################################
+	# Instance functionality
+	###########################################################################
+	
+	def destroy(self):
+		pass
+
+	def to_string(self):
+		pass
+
+	def bind(self, session=None):
+		if not session:
+			raise IllegalArgumentException("'session' is required")
+		self._session = session
+
+	def unbind(self):
+		self._session = None
+
+	###########################################################################
 	# Data Access APIs
 	###########################################################################
 	
@@ -85,7 +168,7 @@ class DAO(object):
 		pass
 
 	###########################################################################
-	# Data Set operations
+	# Data Set Operations
 	###########################################################################
 	
 	def add(self, other):
@@ -114,13 +197,13 @@ class DAO(object):
 		pass
 
 	###########################################################################
-	# Container operations
+	# Container Operations
 	###########################################################################
 	
 	def size(self):
 		pass
 
-	def has(self, key):
+	def contains(self, key):
 		pass
 
 	def reversed(self):
@@ -133,7 +216,7 @@ class DAO(object):
 		pass
 
 	###########################################################################
-	# Private functions
+	# Private Methods
 	# Top-level implementations should not have to worry about these methods
 	# DAO does some simple rerouting of python internal methods to allow
 	# implementations to easily alter data access behavior.
@@ -187,7 +270,7 @@ class DAO(object):
 		return self.iterator()
 
 	def __contains__(self, key):
-		return self.has(key)
+		return self.contains(key)
 
 	def __reversed__(self):
 		return self.reversed()
