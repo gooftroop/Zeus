@@ -38,12 +38,14 @@ class Model(DAO):
 	Wrapper object to adapt data source model for use with a Transactor
 	"""
 
+	_get_mapper = dict(all="all", first="first", one="one")
+
 	def __init__(self, table):
 
 		if not table:
 			raise IllegalArgumentException("Table is required")
 
-		super(SQL, self).__init__(self)
+		super(Model, self).__init__(self)
 		self.table = table
 		self._session = None
 
@@ -66,7 +68,7 @@ class Model(DAO):
 	###########################################################################
 	
 	# TODO use the current bind(session) schema, or require that session be passed in?
-	def get(self, name, **kwargs):
+	def get(self, name, method, **kwargs):
 		# Gets a row from the table
 		# TODO 
 		# - if name is not specified - don't error out => just don't use .get()
@@ -75,11 +77,35 @@ class Model(DAO):
 		# - first?
 		# - as_scalar (or scalar)?
 		# - order_by?
-		if not name:
-			raise IllegalArgumentException("'name' is required. Name is the identifier (or primary key) of the row to" +
-										   "retrieve")
+		
+		_distinct = kwargs.pop("distict", None)
+		_order_by = kwargs.pop("order_by", False)
+		_group_by = kwargs.pop("group_by", None)
+		_having = kwargs.pop("having", None)
+		_limit = kwargs.pop("limit", None)
+		_ret = self.session.query(self)
+		if name:
+			_ret = _ret.get(name)
 
-	def create(self, name, **kwargs):
+		if _distinct is not None:
+			_ret = _ret.distict()
+
+		if _group_by is not None:
+			_ret = _ret.group_by(_group_by)
+			if _having is not None:
+				_ret = _ret.having(_having)
+
+		if _limit is not None:
+			_ret = _ret.limit(_limit)
+
+		_ret.filter_by(kwargs).order_by(_order_by)
+
+		if not method or method == "raw":
+			return _ret
+
+		return getattr(_ret, self._get_mapper(method))()
+
+	def create(self, **kwargs):
 		# Creates a new row
 		# This...I'm strugglebus with. Session doesn't actually expose a way to 
 		# insert into a table. We can use .add, but since our Tables are generated
@@ -88,14 +114,12 @@ class Model(DAO):
 		if not name:
 			raise IllegalArgumentException("'name' is required. Name is the identifier (or primary key) of the row to" +
 										   "create")
+		_warn = kwargs.pop("_warn", True)
+		_new = self.table(kwargs)
+		self.session.add(_new)
 
 	def update(self, name, values, **kwargs):
 		# Updates a new row with the specified content
-		# TODO 
-		# - if name is not specified - don't error out => just don't use .get()
-		if not name:
-			raise IllegalArgumentException("'name' is required. Name is the identifier (or primary key) of the row to" +
-										   "update")
 
 		if not values:
 			raise IllegalArgumentException("'values' are required")
@@ -103,8 +127,11 @@ class Model(DAO):
 		_sync_stratey = kwargs.pop("synchronize_session", "evaluate")
 		_update_args = kwargs.pop("update_args", None)
 
-		self.session.query(self).get(name)
-			.filter_by(kwargs)
+		_ret = self.session.query(self)
+		if name:
+			_ret = _ret.get(name)
+
+		_ret.filter_by(kwargs)
 			.update(values, synchronize_session=_sync_stratey, update_args=_update_args)
 
 	def replace(self, name, values, **kwargs):
@@ -113,15 +140,14 @@ class Model(DAO):
 
 	def delete(self, name, **kwargs):
 		# Deletes rows matched by a query
-		# TODO 
-		# - if name is not specified - don't error out => just don't use .get()
-		if not name:
-			raise IllegalArgumentException("'name' is required. Name is the identifier (or primary key) of the row to" +
-										   "either have information removed from or deleted")
+		# TODO do we need to consider session.expunge?
 
 		_sync_stratey = kwargs.pop("synchronize_session", "evaluate")
-		self.session.query(self).get(name)
-			.filter_by(kwargs)
+		_ret = self.session.query(self)
+		if name:
+			_ret = _ret.get(name)
+
+		_ret.filter_by(kwargs)
 			.delete(synchronize_session=_sync_stratey)
 
 	# Special case?
@@ -199,6 +225,8 @@ class SQL(Transactor):
 	def __init__(self, dbtype="mysql", connection_uri=None, logging=True, autoflush=True):
 		"""
 		"""
+
+		# TODO allow load of table via name from the table or by a model defined elsewhere (via configuration)
 
 		if not connection_uri:
 			raise IllegalArgumentException("The database connection URI is required")
