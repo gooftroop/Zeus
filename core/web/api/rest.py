@@ -1,13 +1,9 @@
 # -*- coding: utf-8 -*-
 
-# This is the end-point for a rest API. Provides CRUD operations
-# rest has a request and response handler
-# rest is a <tornado request>
-# rest uses/calls the dao
-# 
-# Implementors should define custom APIs extending rest (which provides the adapter to be associated with the DAO)
-
 """
+The end-point for a REST API. Provides the Typing and core functionality needed
+to perform JSON-based CRUD operations. Implementors should define custom APIs 
+extending the REST API.
 """
 
 import json
@@ -57,21 +53,10 @@ class RESTResponseHandler(ResponseHandler):
         if response is None:
             response = {}
         elif isinstance(response, str):
-            if response.startswith("{") and response.endswith("}"): # TODO this test can be better/more stable, as in...use try/except
-
-                # Validate the dict being passed in by string
-                try:
-                    response = dict(data=self._canonicalize_data(json.loads(response)))
-                except Exception as e:
-                    msg = "Invalid JSON response detected: {0}".format(e)
-                    self.logger.error(msg)
-                    self.request.send_error(status_code=400, reason=msg)
-
-                    # Prevent any additional processing
-                    self.request.finish()
-                    return
-            else:
-                response = dict(message=self._canonicalize_data(response))
+        	try:
+            	response = dict(data=self._canonicalize_data(json.loads(response))
+            except ValueError:
+            	response = dict(message=self._canonicalize_data(response)
         elif isinstance(response, int) or isinstance(response, float):
             response = dict(code=self._canonicalize_data(response))
         elif isinstance(response, tuple):
@@ -105,7 +90,6 @@ class RESTResponseHandler(ResponseHandler):
         elif isinstance(data, str) and re.match(r"false", data, re.IGNORECASE):
             return False
         else:
-            # For now, just return the value. Later expansions can use this to work on the data explicitly
             return data
 
     def parse(self, data):
