@@ -4,12 +4,12 @@
 """
 
 from web.handlers import BaseHandler
+from tornado.websocket import WebSocketHandler
 
-class WebSocket(BaseHandler):
+class WebSocket(BaseHandler, WebSocketHandler):
 	"""
 	"""
 	
-	def configure(self):
-		self.load_backend()
-
-	# Not Yet Implemented
+	def intialize(self):
+		super(WebSocket, self).initialize()
+		self.respond = self.write
