@@ -1,87 +1,105 @@
 # -*- coding: utf-8 -*-
 """
+Acts as a logical proxy over Torando's RequestHandler.
+Tornado bundles the input and output into one class, which muddles the
+basic concept of client-server communication. We have this proxy as a means of
+introducing a more clear architecture by defining distinct objects and their
+roles (separation-of-concern)
 """
+
+from lib.error import IllegalArgumentException
 
 class ResponseHandler(object):
 
     logger = logging.getLogger("ef5")
 
-    def __init__(self, request):
-        if not request:
-            raise AttributeError("Expected request; found 'None'")
+    def __init__(self, ctx):
+        if not ctx:
+            raise IllegalArgumentException("Expected ctx; found 'None'")
 
-        self.request = request
+        self.ctx = ctx
+        self.initialize_filters()
+        self.set_default_headers()
 
-        self._initialize_filters()
-
-    def respond(self, response=None, cache=False):
+    def _respond(self, *args, **kwargs):
         """
         :param response:
         :return:
         """
 
-        if not cache:
-            self.request.set_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        if not kwargs.pop("cache", False):
+            self.ctx.set_header('Cache-Control', 'no-cache, no-store, must-revalidate')
 
-        if response is None:
-            response = {}
-        elif isinstance(response, str):
-            if response.startswith("{") and response.endswith("}"): # TODO this test can be better/more stable
-
-                # Validate the dict being passed in by string
-                try:
-                    response = dict(data=self._canonicalize_data(json.loads(response)))
-                except Exception as e:
-                    msg = "Invalid JSON response detected: {0}".format(e)
-                    self.logger.error(msg)
-                    self.request.send_error(status_code=400, reason=msg)
-
-                    # Prevent any additional processing
-                    self.request.finish()
-                    return
-            else:
-                response = dict(message=self._canonicalize_data(response))
-        elif isinstance(response, int) or isinstance(response, float):
-            response = dict(code=self._canonicalize_data(response))
-        elif isinstance(response, tuple):
-            response = dict(data=self._canonicalize_data(response))
-        elif isinstance(response, list):
-            response = dict(data=self._canonicalize_data(response))
-        elif isinstance(response, dict):
-            response = self._canonicalize_data(response) if "data" in response or "reason" in response \
-                else dict(data=self._canonicalize_data(response))
-
+        response = self.respond(*args, **kwargs)
         response = self.filter(response)
+        self.ctx.write(self.parse(response))
+        self.ctx.finish()
 
-        self.request.write(json.dumps(response))
-        self.request.finish()
+    @property
+    def status(self):
+        return self.ctx.get_status()
 
-    def filter(self, response):
-        return response
+    @property
+    def headers(self):
+        """
+        """
+        return self.ctx._headers
 
-    def _initialize_filters(self):
+    @headers.setter
+    def headers(self, name, value, overwrite=True):
+        """
+        """
+        if overwrite:
+            self.ctx.set_header(name, value)
+        else:
+            self.ctx.add_header(name, value)
+
+    @headers.deleter
+    def headers(self, name):
+        """
+        """
+        self.ctx.clear_header(name)
+
+    def clear(self):
+        """
+        """
+        self.ctx.clear()
+
+    def set_default_headers(self):
+        """
+        """
         pass
 
-    def _canonicalize_data(self, data):
+    def respond(self, *args, **kwargs):
+        """
+        """
+        pass
+
+    def set_status(self, code, reason=None):
+        """
+        """
+        self.ctx.set_status(code, reason)
+
+    def filter(self, response):
+        """
+        """
+        return response
+
+    def initialize_filters(self):
+        """
+        """
+        pass
+
+    def canonicalize_data(self, data):
         """
         :param data:
         :return:
             The canonicalized dictionary
         """
+        return data
 
-        # Format keys to JS safe
-        if isinstance(data, list):
-            return [self._canonicalize_data(val) for val in data]
-        if isinstance(data, tuple):
-            return tuple(self._canonicalize_data(val) for val in data)
-        elif isinstance(data, dict):
-            return dict(
-                (key, self._canonicalize_data(val)) for key, val in data.items()
-            )
-        elif isinstance(data, str) and re.match(r"true", data, re.IGNORECASE):
-            return True
-        elif isinstance(data, str) and re.match(r"false", data, re.IGNORECASE):
-            return False
-        else:
-            # For now, just return the value. Later expansions can use this to work on the data explicitly
-            return data
+    def parse(self, data):
+        """
+        """
+
+        return data

@@ -6,12 +6,16 @@
 # pythonic manner - that is, provide a polymorphic API for python internal
 # attribtue and container methods 
 
-from exceptions import (IllegalStateException, IllegalArgumentException) # TODO implement these
+import tornado.gen as gen
+
+from exceptions import (IllegalStateException, IllegalArgumentException, TransactorException, DAOException) # TODO implement these
 
 
 class Transactor(object):
 	"""
 	"""
+
+	# TODO allow for Transactor reuse opaquely
 
 	def __init__(self):
 		self._models = {}
@@ -57,9 +61,9 @@ class Transactor(object):
 		try:
 			yield self._session
 			self._session.commit()
-		except:
+		except Exception as e: # TDOD placeholder - Catch specific exceptions
 			self._session.rollback()
-			raise
+			raise TransactorException(e)
 		finally:
 			self.close()
 
@@ -114,7 +118,7 @@ class Transactor(object):
 			model.unbind()
 		except KeyError:
 			msg = "'{0}' object has no attribute '{1}'"
-        	raise AttributeError(msg.format(type(self).__name__, name))
+        	raise TransactorException(msg.format(type(self).__name__, name))
 
     def __setattr__(self, name, value):
     	self.new(name, value)

@@ -703,9 +703,9 @@ def _int_or_none(val):
 def parse_body_arguments(content_type, body, arguments, files, headers=None):
     """Parses a form request body.
 
-    Supports ``application/x-www-form-urlencoded``, ``application/json``, ``json``,
-    and ``multipart/form-data``.  The ``content_type`` parameter should be a string
-    and ``body`` should be a byte string.  The ``arguments`` and ``files``
+    Supports ``application/x-www-form-urlencoded`` and ``multipart/form-data``.  
+    The ``content_type`` parameter should be a string and ``body`` 
+    should be a byte string.  The ``arguments`` and ``files``
     parameters are dictionaries that will be updated with the parsed contents.
     """
 
@@ -714,16 +714,7 @@ def parse_body_arguments(content_type, body, arguments, files, headers=None):
                         headers['Content-Encoding'])
         return
 
-    if content_type.startswith("application/json") or content_type.startswith("json"):
-        try:
-            uri_arguments = json.loads(native_str(body))
-        except Exception as e:
-            gen_log.warning('Invalid json body: %s', e)
-            uri_arguments = {}
-        for name, values in uri_arguments.items():
-            if values:
-                arguments.setdefault(name, values)
-    elif content_type.startswith("application/x-www-form-urlencoded"):
+    if content_type.startswith("application/x-www-form-urlencoded"):
         try:
             uri_arguments = parse_qs_bytes(native_str(body), keep_blank_values=True)
         except Exception as e:

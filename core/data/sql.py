@@ -68,6 +68,7 @@ class Model(DAO):
 	###########################################################################
 	
 	# TODO use the current bind(session) schema, or require that session be passed in?
+	@DAO.gen.coroutine
 	def get(self, name, method, **kwargs):
 		# Gets a row from the table
 		# TODO 
@@ -105,6 +106,7 @@ class Model(DAO):
 
 		return getattr(_ret, self._get_mapper(method))()
 
+	@DAO.gen.coroutine
 	def create(self, **kwargs):
 		# Creates a new row
 		# This...I'm strugglebus with. Session doesn't actually expose a way to 
@@ -118,6 +120,7 @@ class Model(DAO):
 		_new = self.table(kwargs)
 		self.session.add(_new)
 
+	@DAO.gen.coroutine
 	def update(self, name, values, **kwargs):
 		# Updates a new row with the specified content
 
@@ -134,10 +137,12 @@ class Model(DAO):
 		_ret.filter_by(kwargs)
 			.update(values, synchronize_session=_sync_stratey, update_args=_update_args)
 
+	@DAO.gen.coroutine
 	def replace(self, name, values, **kwargs):
 		# Replace is semantically no different than update in SQLAlchemy
 		self.update(name, values, **kwargs)
 
+	@DAO.gen.coroutine
 	def delete(self, name, **kwargs):
 		# Deletes rows matched by a query
 		# TODO do we need to consider session.expunge?
@@ -151,16 +156,19 @@ class Model(DAO):
 			.delete(synchronize_session=_sync_stratey)
 
 	# Special case?
+	@DAO.gen.coroutine
 	def expand(self):
 		# Adds a new column to this table
 		# args:
 		pass
 
+	@DAO.gen.coroutine
 	def contrain(self):
 		# Adds a new constraint to this table
 		# args:
 		pass
 
+	@DAO.gen.coroutine
 	def join(self):
 		# Performs the specified join
 		# args:
@@ -173,27 +181,35 @@ class Model(DAO):
 	# If operations are being done on the same Table, then do nothing
 	# If operations are being done against other Tables, then perform joins
 	# Otherwise, then use union, intersection, etc.
+	@DAO.gen.coroutine
 	def add(self, other):
 		pass 
 
+	@DAO.gen.coroutine
 	def sub(self, other):
 		pass 
 
+	@DAO.gen.coroutine
 	def mul(self, other):
 		pass 
 
+	@DAO.gen.coroutine
 	def div(self, other):
 		pass 
 
+	@DAO.gen.coroutine
 	def AND(self, other):
 		pass 
 
+	@DAO.gen.coroutine
 	def OR(self, other):
 		pass 
 
+	@DAO.gen.coroutine
 	def XOR(self, other):
 		pass
 
+	@DAO.gen.coroutine
 	def invert(self, other):
 		# Complement
 		pass

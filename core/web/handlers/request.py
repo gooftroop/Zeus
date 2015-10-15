@@ -1,14 +1,23 @@
 # -*- coding: utf-8 -*-
+# 
 """
 """
 
 import traceback
 
-import tornado.web as webb
+import tornado.web as web
 import tornado.gen as gen
 import config.global_settings as settings
 
 from lib.auth import is_authenticated
+from lib.error import (
+						ImproperlyConfiguredException, 
+						NotYetImplementedException, 
+						IllegalArgumentException, 
+						TransactorException, 
+						DAOException, 
+						ValidationException
+					  )
 
 GET = "get"
 POST = "post"
@@ -61,28 +70,167 @@ def authenticated(method):
     return wrapper
 
 
+def backend(original_class):
+    """
+    Declare the backend to be used by the decorated class
+    """
+
+def model(original_class):
+    """
+   	Declare the model name to be used by the decorated class
+    """
+    
+def responsehandler(original_class):
+	"""
+	Declare the Response Handler object to be used with the class 
+	"""
+
+def validate(method):
+	"""
+	Ok, so....the user needs to define validation methods, right?
+	theres validation on the http request input, validation on the models, etc...
+	So how do I want to do this?
+	Maybe have them define validation callbacks to loop through for pre dao and post dao calls?
+	We keep validate and request filter separate just to refine intent on a request
+	"""
+	@functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        
+        return method(self, *args, **kwargs)
+    return wrapper
+
+
+def requestfilter(method):
+	"""
+	Call a whole bunch of filters on the request before da calls?
+	"""
+	@functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        
+        return method(self, *args, **kwargs)
+    return wrapper
+
+
+def responsefilter(method):
+	"""
+	Call a while bunch of filters on the response before finishing?
+	"""
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        
+        return method(self, *args, **kwargs)
+    return wrapper
+
+
+def catch(Catch, message=None):
+	"""
+	Handle the defined exception
+	"""
+
+	def catch_decorator(fn):
+		@functools.wraps(fn)
+		def fn_wrapper(*args, **kwargs):
+			try:
+				return fn(*args, **kwargs)
+			except Catch as e:
+				msg = "{0}".format(e)
+				if message is not None:
+					msg = "{0} ({1})".format(message, msg)
+	    		raise BaseHandler.HTTPError(400, log_message=msg, reason=msg)
+
+
 class BaseHandler(web.RequestHandler):
     """
     """
 
     logger = logging.getLogger("ef5")
+    _response = None
+    _backend = None
+    _response = None
 
     def initialize(self):
         """
+        Do not override
         :return:
         """
+        self.configure()
+        if self.response is None:
+        	raise ImproperlyConfiguredException("Missing response object")
 
-        self.response = ResponseHandler(self)
+    ###########################################################################
+    # Properties
+    ###########################################################################
 
-    def prepare(self):
+    @property
+    def backend(self):
+        return self._backend
+
+    @backend.setter
+    def backend(self, _backend):
+    	if _backend is None:
+    		raise IllegalArgumentException("backend cannot be empty")
+    	self._backend = _backend
+
+    @property
+    def response(self):
+        return self._response
+    
+    @response.setter
+    def response(self, _response):
+    	# TODO each response should inherit from a single Response Object
+    	# check for that
+    	if _response is None:
+    		raise IllegalArgumentException("reponse cannot be empty")
+    	self._response = _response
+
+    ###########################################################################
+    # Functions
+    ###########################################################################
+
+    def configure(self):
+    	"""
+    	"""
+    	pass
+
+   	# TODO set up basic HTTP Auth. Also sure that this could be better
+    def get_current_user(self):
+        """
+        Tornado's authenticated check is basic, so we need to do some extra validation against
+        Element to verify that the current user is auth'd and not stale
+        """
+
+        user = self.get_cookie(settings.USER_COOKIE)
+        if user is None:
+            return None
+        else:
+            if not is_authenticated(self, user):
+                self.logger.info("Authentication Failed. Access is forbidden.")
+                return None
+
+            return user
+
+    def load_backend(self):
+    	"""
+    	"""
+
+    	# if backend is none, look for the backend in the running conf
+    	# otherwise, error out
+
+    	if self.backend is None:
+    		raise ImproperlyConfiguredException("Backend not set")
+
+    def on_finish(self):
+    	"""
+    	"""
+    	pass
+
+   	def prepare(self):
         """
         """
+        pass
 
-        self.before_prepare()
-
-        super(BaseHandler, self).prepare()
-
-        self.after_prepare()
+    def respond(self, *args, **kwargs):
+    	self.response._respond(*args, **kwargs)
 
     def write_error(self, status_code, **kwargs):
         """
@@ -121,59 +269,7 @@ class BaseHandler(web.RequestHandler):
 
         self.response.respond(data)
 
-    # TODO set up basic HTTP Auth. Also sure that this could be better
-    def get_current_user(self):
-        """
-        Tornado's authenticated check is basic, so we need to do some extra validation against
-        Element to verify that the current user is auth'd and not stale
-        """
-
-        user = self.get_cookie(settings.USER_COOKIE)
-        if user is None:
-            return None
-        else:
-            if not is_authenticated(self, user):
-                self.logger.info("Authentication Failed. Access is forbidden.")
-                return None
-
-            return user
-
-    def before_prepare(self):
-        """
-        :return:
-        """
-        pass
-
-    def after_prepare(self):
-        """
-        :return:
-        """
-        pass
-
-    def get(self):
-        msg = "GET operation not supported"
-        raise HTTPError(403, log_message=msg, reason=msg)
-
-    def post(self):
-        msg = "POST operation not supported"
-        raise HTTPError(403, log_message=msg, reason=msg)
-
-    def put(self):
-        msg = "PUT operation not supported"
-        raise HTTPError(403, log_message=msg, reason=msg)
-
-    def patch(self):
-        msg = "PATCH operation not supported"
-        raise HTTPError(403, log_message=msg, reason=msg)
-
-    def delete(self):
-        msg = "DELETE operation not supported"
-        raise HTTPError(403, log_message=msg, reason=msg)
-
-    def head(self):
-        msg = "HEAD operation not supported"
-        raise HTTPError(403, log_message=msg, reason=msg)
-
-    def options(self):
-        msg = "OPTIONS operation not supported"
-        raise HTTPError(403, log_message=msg, reason=msg)
+    def validate(self):
+    	"""
+    	"""
+    	pass
