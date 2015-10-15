@@ -1,4 +1,4 @@
-# Posiden
+# Poseidon
 Implementation of Tornado. Mocana prototype
 
 NOTE:
