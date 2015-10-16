@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# 
+
 """
 """
 
@@ -11,11 +11,11 @@ import config.global_settings as settings
 
 from lib.auth import is_authenticated
 from lib.error import (
-						ImproperlyConfiguredException, 
-						NotYetImplementedException, 
-						IllegalArgumentException, 
-						TransactorException, 
-						DAOException, 
+						ImproperlyConfiguredException,
+						NotYetImplementedException,
+						IllegalArgumentException,
+						TransactorException,
+						DAOException,
 						ValidationException
 					  )
 
@@ -34,9 +34,10 @@ OPTIONS = "options"
 FALLBACK_ERROR_TITLE = "Oops!"
 FALLBACK_ERROR_MESSAGE = "An error occurred while processing your request. Please contact your System Administrator"
 
+
 def authenticated(method):
     """
-    @bwebb Pulled from Torando web.py to alter the behavior
+   	@bwebb Pulled from Torando web.py to alter the behavior
     of auth failure to redirect if REDIRECT_LOGIN is true, error out
     otherwise, for all wrapped methods.
 
@@ -75,15 +76,18 @@ def backend(original_class):
     Declare the backend to be used by the decorated class
     """
 
+
 def model(original_class):
     """
-   	Declare the model name to be used by the decorated class
+	Declare the model name to be used by the decorated class
     """
-    
+
+
 def responsehandler(original_class):
 	"""
-	Declare the Response Handler object to be used with the class 
+	Declare the Response Handler object to be used with the class
 	"""
+
 
 def validate(method):
 	"""
@@ -94,8 +98,8 @@ def validate(method):
 	We keep validate and request filter separate just to refine intent on a request
 	"""
 	@functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        
+	def wrapper(self, *args, **kwargs):
+
         return method(self, *args, **kwargs)
     return wrapper
 
@@ -137,6 +141,90 @@ def catch(Catch, message=None):
 				if message is not None:
 					msg = "{0} ({1})".format(message, msg)
 	    		raise BaseHandler.HTTPError(400, log_message=msg, reason=msg)
+
+
+def GET(url):
+	"""
+	Define a controller for a GET operation
+	"""
+
+	@functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        
+        return method(self, *args, **kwargs)
+    return wrapper
+
+
+def POST(url):
+	"""
+	Define a controller for a POST operation
+	"""
+
+	@functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        
+        return method(self, *args, **kwargs)
+    return wrapper
+
+
+def PUT(url):
+	"""
+	Define a controller for a PUT operation
+	"""
+
+	@functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        
+        return method(self, *args, **kwargs)
+    return wrapper
+
+
+def PATCH(url):
+	"""
+	Define a controller for a PATCH operation
+	"""
+
+	@functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        
+        return method(self, *args, **kwargs)
+    return wrapper
+
+
+def DELETE(url):
+	"""
+	Define a controller for a DELETE operation
+	"""
+
+	@functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        
+        return method(self, *args, **kwargs)
+    return wrapper
+
+
+def OPTIONS(url):
+	"""
+	Define a controller for a OPTIONS operation
+	"""
+
+	@functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        
+        return method(self, *args, **kwargs)
+    return wrapper
+
+
+def HEAD(url):
+	"""
+	Define a controller for a HEAD operation
+	"""
+
+	@functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        
+        return method(self, *args, **kwargs)
+    return wrapper
 
 
 class BaseHandler(web.RequestHandler):

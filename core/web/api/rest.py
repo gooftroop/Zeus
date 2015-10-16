@@ -2,7 +2,7 @@
 
 """
 The end-point for a REST API. Provides the Typing and core functionality needed
-to perform JSON-based CRUD operations. Implementors should define custom APIs 
+to perform JSON-based CRUD operations. Implementors should define custom APIs
 extending the REST API.
 """
 
@@ -16,34 +16,98 @@ from web.handlers import ResponseHandler
 CONTENT_JSON = "json"
 CONTENT_APPLICATION_JSON = "application/json"
 
+"""
+
+sooooooo....novel idea, but what if we define the url via something like
+@GET("/something/{id}"), etc? we can define a root for the class. This would
+then allow implementors to define some sort of control method and we can wrap
+it with all the exception handling, coroutine, etc we need. We would hide the
+get/post/put, etc. methods and any method wrapped by the corresponding
+decorator would be called by its named method
+
+so then we wouldn't need multiple models for element (just one) and we
+have multiple endpoints for our models? or maybe we can have endpoints
+per grouping?
+
+So the last question would then how we hook into tornado's url handling without
+imposing a hit to performance?
+
+--> allow pattern matching in the url
+
+--> biggest question is...how does the server determine all the urls at 
+    startup? or does it even need to? can it do a search during a request? 
+    that might take a lot of changes to tornado...also slower too. so nope. 
+    back to the first question.
+
+@backend("Element")
+@root("/atlas/api")
+class Atlas(REST):
+
+    @authorized
+    # The slug would be the last matching group, and then parameters would be
+    # dumped into kwargs iff they are named
+    @GET("/configuration/context/(?<context>[\w\d-]+){1}/.*/(.*)?")
+    def get(self, slug):
+
+        # TODO I'd like to hide the future/result content -- ideally the
+        # implementors. just code the backend access and we handle the rest
+        result = self.backend.load(self.model).get(slug, **self.parameters)
+        if is_future(result): # import is_future
+            result = yield result
+
+        self.respond(result)
+
+
+@backend("SQL")
+@model("User") # TODO allow either class or function? Should load the Model
+@root("/atlas/api")
+class Login(REST):
+
+    @GET("/login")
+    def get(self):
+        # etc...
+
+    @POST("/login")
+    def login(self):
+        username = self.parameters["username"]
+        password = self.parameters["password"]
+        # etc...
+
+"""
 
 @BaseHandler.responsehandler(RESTResponseHandler)
 class REST(BaseHandler):
-	
-	def initialize(self):
 
-		content_type = self.headers.get("Content-Type", "")
-		if content_type.startswith(CONTENT_APPLICATION_JSON) or content_type.startswith(CONTENT_JSON):
-	        try:
-	            uri_arguments = json.loads(native_str(self.body))
-	        except ValueError as e:
-	            self.logger.warning('Invalid json body: {0}'.format(e))
-	            uri_arguments = {}
-	        for name, values in uri_arguments.items():
-	            if values:
-	                self.body_arguments.setdefault(name, values)
-        else
-        	msg = "Malformed request: invalid content type; expecting 'applcation/json' or 'json'"
-        	raise BaseHandler.HTTPError(400, log_message=msg, reason=msg)
+    def initialize(self):
 
-    super(REST, self).initialize()
+        content_type = self.headers.get("Content-Type", "")
+        if content_type.startswith(CONTENT_APPLICATION_JSON) or \
+           content_type.startswith(CONTENT_JSON):
+            try:
+                uri_arguments = json.loads(native_str(self.body))
+            except ValueError as e:
+                self.logger.warning('Invalid json body: {0}'.format(e))
+                uri_arguments = {}
+            for name, values in uri_arguments.items():
+                if values:
+                    self.body_arguments.setdefault(name, values)
+        else:
+            msg = "Malformed request: invalid content type; expecting \
+                  'applcation/json' or 'json'"
+            raise BaseHandler.HTTPError(400, log_message=msg, reason=msg)
+
+        super(REST, self).initialize()
+
+    @property
+    def parameters(self):
+        return self.body_arguments
 
 
 class RESTResponseHandler(ResponseHandler):
 	"""
-	"""
+    """
 
-	@BaseHandler.responsefilter
+    @BaseHandler.responsefilter
     def respond(self, response=None):
         """
         :param response:

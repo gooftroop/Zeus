@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# 
+#
 # Use sqlalchemy.
 # Supports:
 # Drizzle
@@ -9,21 +9,21 @@
 # PostgreSQL
 # SQLite
 # Sybase
-# 
-# Users should extend sql.py to create "ORM/RDB models". The models will be responsible for providing the 
+#
+# Users should extend sql.py to create "ORM/RDB models". The models will be responsible for providing the
 # custom fields, while sql.py will be responsible for providing the interface to actually interact with the RDB
-# 
+#
 # Say our mysql DB has a table Users
 # I'd like to be able to do something like (assuming we defined a table in the DB as 'Users'):
 # import sql
-# 
+#
 # db = SQL(connection_uri="snowflake.db")
 # users = db.Users.get()
-# 
+#
 # or:
-# 
+#
 # db.Users.create("admin", password="123", email="admin@snowflake.com")
-# 
+#
 
 from dao import DAO
 from sqlalchemy import (create_engine, event)
@@ -34,342 +34,381 @@ CONNECTION_URI_DELIM = ":///"
 
 
 class Model(DAO):
-	"""
-	Wrapper object to adapt data source model for use with a Transactor
-	"""
 
-	_get_mapper = dict(all="all", first="first", one="one")
+    """
+    Wrapper object to adapt data source model for use with a Transactor
+    """
 
-	def __init__(self, table):
+    _get_mapper = dict(all="all", first="first", one="one")
 
-		if not table:
-			raise IllegalArgumentException("Table is required")
+    def __init__(self, table):
 
-		super(Model, self).__init__(self)
-		self.table = table
-		self._session = None
+        if not table:
+            raise IllegalArgumentException("Table is required")
 
-	###########################################################################
-	# Instance functionality
-	# 
-	# The following methods provide an interface/proxy to the current Session
-	###########################################################################
-	
-	def destroy(self):
-		this.unbind()
-		# TODO Any additional cleanup on the table? Drop the table from the session?
+        super(Model, self).__init__(self)
+        self.table = table
+        self._session = None
 
-	def to_string(self):
-		# Hmmmm.....
-		pass
+    ###########################################################################
+    # Instance functionality
+    #
+    # The following methods provide an interface/proxy to the current Session
+    ###########################################################################
 
-	###########################################################################
-	# Data Access APIs
-	###########################################################################
-	
-	# TODO use the current bind(session) schema, or require that session be passed in?
-	@DAO.gen.coroutine
-	def get(self, name, method, **kwargs):
-		# Gets a row from the table
-		# TODO 
-		# - if name is not specified - don't error out => just don't use .get()
-		# - allow distinct?
-		# - one_or_none?
-		# - first?
-		# - as_scalar (or scalar)?
-		# - order_by?
-		
-		_distinct = kwargs.pop("distict", None)
-		_order_by = kwargs.pop("order_by", False)
-		_group_by = kwargs.pop("group_by", None)
-		_having = kwargs.pop("having", None)
-		_limit = kwargs.pop("limit", None)
-		_ret = self.session.query(self)
-		if name:
-			_ret = _ret.get(name)
+    def destroy(self):
+        this.unbind()
+        # TODO Any additional cleanup on the table? Drop the table from the session?
 
-		if _distinct is not None:
-			_ret = _ret.distict()
+    def to_string(self):
+        # Hmmmm.....
+        pass
 
-		if _group_by is not None:
-			_ret = _ret.group_by(_group_by)
-			if _having is not None:
-				_ret = _ret.having(_having)
+    ###########################################################################
+    # Data Access APIs
+    ###########################################################################
 
-		if _limit is not None:
-			_ret = _ret.limit(_limit)
+    # TODO use the current bind(session) schema, or require that session be passed in?
+    @DAO.coroutine
+    def get(self, name, method, **kwargs):
+        # Gets a row from the table
+        # TODO
+        # - if name is not specified - don't error out => just don't use .get()
+        # - allow distinct?
+        # - one_or_none?
+        # - first?
+        # - as_scalar (or scalar)?
+        # - order_by?
 
-		_ret.filter_by(kwargs).order_by(_order_by)
+        _distinct = kwargs.pop("distict", None)
+        _order_by = kwargs.pop("order_by", False)
+        _group_by = kwargs.pop("group_by", None)
+        _having = kwargs.pop("having", None)
+        _limit = kwargs.pop("limit", None)
+        _ret = self.session.query(self)
+        if name:
+            _ret = _ret.get(name)
 
-		if not method or method == "raw":
-			return _ret
+        if _distinct is not None:
+            _ret = _ret.distict()
 
-		return getattr(_ret, self._get_mapper(method))()
+        if _group_by is not None:
+            _ret = _ret.group_by(_group_by)
+            if _having is not None:
+                _ret = _ret.having(_having)
 
-	@DAO.gen.coroutine
-	def create(self, **kwargs):
-		# Creates a new row
-		# This...I'm strugglebus with. Session doesn't actually expose a way to 
-		# insert into a table. We can use .add, but since our Tables are generated
-		# dynamically, this proves to be difficult (maybe impossible). Accessing
-		# Table might work, but the API is not particularly clear
-		if not name:
-			raise IllegalArgumentException("'name' is required. Name is the identifier (or primary key) of the row to" +
-										   "create")
-		_warn = kwargs.pop("_warn", True)
-		_new = self.table(kwargs)
-		self.session.add(_new)
+        if _limit is not None:
+            _ret = _ret.limit(_limit)
 
-	@DAO.gen.coroutine
-	def update(self, name, values, **kwargs):
-		# Updates a new row with the specified content
+        _ret.filter_by(kwargs).order_by(_order_by)
 
-		if not values:
-			raise IllegalArgumentException("'values' are required")
+        if not method or method == "raw":
+            return _ret
 
-		_sync_stratey = kwargs.pop("synchronize_session", "evaluate")
-		_update_args = kwargs.pop("update_args", None)
+        return getattr(_ret, self._get_mapper(method))()
 
-		_ret = self.session.query(self)
-		if name:
-			_ret = _ret.get(name)
+    @DAO.coroutine
+    def create(self, **kwargs):
+        # Creates a new row
+        # This...I'm strugglebus with. Session doesn't actually expose a way to
+        # insert into a table. We can use .add, but since our Tables are generated
+        # dynamically, this proves to be difficult (maybe impossible). Accessing
+        # Table might work, but the API is not particularly clear
+        if not name:
+            raise IllegalArgumentException("'name' is required. Name is the identifier (or primary key) of the row to" +
+                                           "create")
+        _warn = kwargs.pop("_warn", True)
+        _new = self.table(kwargs)
+        self.session.add(_new)
 
-		_ret.filter_by(kwargs)
-			.update(values, synchronize_session=_sync_stratey, update_args=_update_args)
+    @DAO.coroutine
+    def update(self, name, values, **kwargs):
+        # Updates a new row with the specified content
 
-	@DAO.gen.coroutine
-	def replace(self, name, values, **kwargs):
-		# Replace is semantically no different than update in SQLAlchemy
-		self.update(name, values, **kwargs)
+        if not values:
+            raise IllegalArgumentException("'values' are required")
 
-	@DAO.gen.coroutine
-	def delete(self, name, **kwargs):
-		# Deletes rows matched by a query
-		# TODO do we need to consider session.expunge?
+        _sync_stratey = kwargs.pop("synchronize_session", "evaluate")
+        _update_args = kwargs.pop("update_args", None)
 
-		_sync_stratey = kwargs.pop("synchronize_session", "evaluate")
-		_ret = self.session.query(self)
-		if name:
-			_ret = _ret.get(name)
+        _ret = self.session.query(self)
+        if name:
+            _ret = _ret.get(name)
 
-		_ret.filter_by(kwargs)
-			.delete(synchronize_session=_sync_stratey)
+        _ret.filter_by(kwargs)
+            .update(values, synchronize_session=_sync_stratey, update_args=_update_args)
 
-	# Special case?
-	@DAO.gen.coroutine
-	def expand(self):
-		# Adds a new column to this table
-		# args:
-		pass
+    @DAO.coroutine
+    def replace(self, name, values, **kwargs):
+        # Replace is semantically no different than update in SQLAlchemy
+        self.update(name, values, **kwargs)
 
-	@DAO.gen.coroutine
-	def contrain(self):
-		# Adds a new constraint to this table
-		# args:
-		pass
+    @DAO.coroutine
+    def delete(self, name, **kwargs):
+        # Deletes rows matched by a query
+        # TODO do we need to consider session.expunge?
 
-	@DAO.gen.coroutine
-	def join(self):
-		# Performs the specified join
-		# args:
-		pass
+        _sync_stratey = kwargs.pop("synchronize_session", "evaluate")
+        _ret = self.session.query(self)
+        if name:
+            _ret = _ret.get(name)
 
-	###########################################################################
-	# Data Set operations
-	###########################################################################
-	
-	# If operations are being done on the same Table, then do nothing
-	# If operations are being done against other Tables, then perform joins
-	# Otherwise, then use union, intersection, etc.
-	@DAO.gen.coroutine
-	def add(self, other):
-		pass 
+        _ret.filter_by(kwargs)
+            .delete(synchronize_session=_sync_stratey)
 
-	@DAO.gen.coroutine
-	def sub(self, other):
-		pass 
+    # Special case?
+    @DAO.coroutine
+    def expand(self):
+        # Adds a new column to this table
+        # args:
+        pass
 
-	@DAO.gen.coroutine
-	def mul(self, other):
-		pass 
+    @DAO.coroutine
+    def contrain(self):
+        # Adds a new constraint to this table
+        # args:
+        pass
 
-	@DAO.gen.coroutine
-	def div(self, other):
-		pass 
+    @DAO.coroutine
+    def join(self):
+        # Performs the specified join
+        # args:
+        pass
 
-	@DAO.gen.coroutine
-	def AND(self, other):
-		pass 
+    ###########################################################################
+    # Data Set operations
+    ###########################################################################
 
-	@DAO.gen.coroutine
-	def OR(self, other):
-		pass 
+    # If operations are being done on the same Table, then do nothing
+    # If operations are being done against other Tables, then perform joins
+    # Otherwise, then use union, intersection, etc.
+    @DAO.coroutine
+    def add(self, other):
+        pass
 
-	@DAO.gen.coroutine
-	def XOR(self, other):
-		pass
+    @DAO.coroutine
+    def sub(self, other):
+        pass
 
-	@DAO.gen.coroutine
-	def invert(self, other):
-		# Complement
-		pass
+    @DAO.coroutine
+    def mul(self, other):
+        pass
 
-	###########################################################################
-	# Container operations
-	###########################################################################
-	
-	def size(self):
-		pass
+    @DAO.coroutine
+    def div(self, other):
+        pass
 
-	def contains(self, key):
-		pass
+    @DAO.coroutine
+    def AND(self, other):
+        pass
 
-	def reversed(self):
-		pass
+    @DAO.coroutine
+    def OR(self, other):
+        pass
 
-	def defaults(self, key):
-		pass
+    @DAO.coroutine
+    def XOR(self, other):
+        pass
 
-	def iterator(self):
-		pass
+    @DAO.coroutine
+    def invert(self, other):
+        # Complement
+        pass
+
+    ###########################################################################
+    # Container operations
+    ###########################################################################
+
+    def size(self):
+        pass
+
+    def contains(self, key):
+        pass
+
+    def reversed(self):
+        pass
+
+    def defaults(self, key):
+        pass
+
+    def iterator(self):
+        pass
 
 
 class SQL(Transactor):
-	"""
-	"""
 
-	def __init__(self, dbtype="mysql", connection_uri=None, logging=True, autoflush=True):
-		"""
-		"""
+    """
+    """
 
-		# TODO allow load of table via name from the table or by a model defined elsewhere (via configuration)
+    def __init__(self, dbtype="mysql", connection_uri=None, logging=True, autoflush=True):
+        """
+        """
 
-		if not connection_uri:
-			raise IllegalArgumentException("The database connection URI is required")
+        # TODO allow load of table via name from the table or by a model defined elsewhere (via configuration)
 
-		super(SQL, self).__init__(self)
+        if not connection_uri:
+            raise IllegalArgumentException("The database connection URI is required")
 
-		self._connection_uri = connection_uri
-		self._dbtype = dbtype
-		self._engine = create_engine(dbtype + CONNECTION_URI_DELIM + connection_uri, echo=logging)
-		self._meta = MetaData()
+        super(SQL, self).__init__(self)
 
-		self.refresh()
+        self._connection_uri = connection_uri
+        self._dbtype = dbtype
+        self._engine = create_engine(dbtype + CONNECTION_URI_DELIM + connection_uri, echo=logging)
+        self._meta = MetaData()
 
-	###########################################################################
-	# SQLAlchemy Specific functionality
-	###########################################################################
-	
-	def on(target, event, callback, retval=False):
-		if not target:
-			raise IllegalArgumentException("'target' is requried")
+        self.refresh()
 
-		if not event:
-			raise IllegalArgumentException("'event' is requried")
+    ###########################################################################
+    # SQLAlchemy Specific functionality
+    ###########################################################################
 
-		if not callback:
-			raise IllegalArgumentException("'callback' is requried")
+    def on(target, event, callback, retval=False):
+        if not target:
+            raise IllegalArgumentException("'target' is requried")
 
-		event.listen(target, event, callback, retval=retval)
+        if not event:
+            raise IllegalArgumentException("'event' is requried")
 
-	def off(target, event, callback):
-		if not target:
-			raise IllegalArgumentException("'target' is requried")
+        if not callback:
+            raise IllegalArgumentException("'callback' is requried")
 
-		if not event:
-			raise IllegalArgumentException("'event' is requried")
+        event.listen(target, event, callback, retval=retval)
 
-		if not callback:
-			raise IllegalArgumentException("'callback' is requried")
+    def off(target, event, callback):
+        if not target:
+            raise IllegalArgumentException("'target' is requried")
 
-		event.remove(targe, event, callback)
+        if not event:
+            raise IllegalArgumentException("'event' is requried")
 
-	def registered(target, event, callback):
-		if not target:
-			raise IllegalArgumentException("'target' is requried")
+        if not callback:
+            raise IllegalArgumentException("'callback' is requried")
 
-		if not event:
-			raise IllegalArgumentException("'event' is requried")
+        event.remove(targe, event, callback)
 
-		if not callback:
-			raise IllegalArgumentException("'callback' is requried")
+    def registered(target, event, callback):
+        if not target:
+            raise IllegalArgumentException("'target' is requried")
 
-		event.remove(targe, event, callback)
-	
-	###########################################################################
-	# Override Object behavior
-	###########################################################################
+        if not event:
+            raise IllegalArgumentException("'event' is requried")
 
-	def new(self, name, value):
-		# Create new Table
-		pass
+        if not callback:
+            raise IllegalArgumentException("'callback' is requried")
 
-	def delete(self, name):
-		# Delete Table
-		pass
+        event.remove(targe, event, callback)
 
-	def destroy(self):
-		# Clean up self
-		self.close()
+    ###########################################################################
+    # Override Object behavior
+    ###########################################################################
 
-	def to_string(self):
-		return "SQL Transactor {0}".format(self.model_names())
+    def new(self, name, value):
+        # Create new Table
+        pass
 
-	def refresh(self, schema=None, views=False, only=None, extend_existing=False, 
-				autoload_replace=True, **dialect_kwargs):
+    def delete(self, name):
+        # Delete Table
+        pass
 
-		self._meta.reflect(bind=self._engine, schema=schema, views=views, only=only, 
-						   extend_existing=extend_existing, autoload_replace=autoload_replace, 
-						   **dialect_kwargs)
+    def destroy(self):
+        # Clean up self
+        self.close()
 
-		for name, table in self._meta.tables:
-			if not hasattr(self._models, name):
-				self._models[name] = Model(table, self._engine)
+    def to_string(self):
+        return "SQL Transactor {0}".format(self.model_names())
 
-	# TODO Question - right now we expose (the) Session object. To use it, 
-	# actors must know about SQLAlchemy's API for the Session. Is there value
-	# in consolidating the Session API into this API?
+    def refresh(self, schema=None, views=False, only=None, extend_existing=False,
+                autoload_replace=True, **dialect_kwargs):
 
-	###########################################################################
-	# Transactional API
-	###########################################################################
+        self._meta.reflect(bind=self._engine, schema=schema, views=views, only=only,
+                           extend_existing=extend_existing, autoload_replace=autoload_replace,
+                           **dialect_kwargs)
 
-	def close(self):
-		if self._session:
-			self._session.close()
-			self._session = None
+        for name, table in self._meta.tables:
+            if not hasattr(self._models, name):
+                self._models[name] = Model(table, self._engine)
+
+    # TODO Question - right now we expose (the) Session object. To use it,
+    # actors must know about SQLAlchemy's API for the Session. Is there value
+    # in consolidating the Session API into this API?
+
+    ###########################################################################
+    # Transactional API
+    ###########################################################################
+
+    def close(self):
+        if self._session:
+            self._session.close()
+            self._session = None
+
+    def invalidate(self):
+        # Useful for calls in except statements
+        if self._session:
+            self._session.invalidate()
+
+    def begin(self):
+        return (self._session=self._session_factory()) if not self._session else self._session
+
+    def tag(self):
+        if not self._session:
+            raise IllegalStateException(
+                "No Session to tag. You must begin a Session prior to tagging (creating a save point)")
+        return self._session.begin_nested()
+
+    def commit(self):
+        if not self._session:
+            raise IllegalStateException("No Session to commit. You must begin a Session prior to committing")
+        self._session.commit()
+
+    def flush(self):
+        if not self._session:
+            raise IllegalStateException("No Session to commit. You must begin a Session prior to flushing")
+        self._session.flush()
+
+    def cancel(self):
+        if not self._session:
+            raise IllegalStateException("No Session to commit. You must begin a Session prior to cancelling")
+        self._session.cancel()
+
+    def rollback(self):
+        if not self._session:
+            raise IllegalStateException("No Session to rollback. You must begin a Session prior to rolling back one")
+        self._session.rollback()
+se(self):
+        if self._session:
+            self._session.close()
+            self._session = None
 
 	def invalidate(self):
-		# Useful for calls in except statements
-		if self._session:
-			self._session.invalidate()
+        # Useful for calls in except statements
+        if self._session:
+            self._session.invalidate()
 
-	def begin(self):
-		return (self._session = self._session_factory()) if not self._session else self._session
+    def begin(self):
+        return (self._session=self._session_factory()) if not self._session else self._session
 
-	def tag(self):
-		if not self._session:
-			raise IllegalStateException("No Session to tag. You must begin a Session prior to tagging (creating a save point)")
-		return self._session.begin_nested()
+    def tag(self):
+        if not self._session:
+            raise IllegalStateException(
+                "No Session to tag. You must begin a Session prior to tagging (creating a save point)")
+        return self._session.begin_nested()
 
-	def commit(self):
-		if not self._session:
-			raise IllegalStateException("No Session to commit. You must begin a Session prior to committing")
-		self._session.commit()
+    def commit(self):
+        if not self._session:
+            raise IllegalStateException("No Session to commit. You must begin a Session prior to committing")
+        self._session.commit()
 
-	def flush(self):
-		if not self._session:
-			raise IllegalStateException("No Session to commit. You must begin a Session prior to flushing")
-		self._session.flush()
+    def flush(self):
+        if not self._session:
+            raise IllegalStateException("No Session to commit. You must begin a Session prior to flushing")
+        self._session.flush()
 
-	def cancel(self):
-		if not self._session:
-			raise IllegalStateException("No Session to commit. You must begin a Session prior to cancelling")
-		self._session.cancel()
+    def cancel(self):
+        if not self._session:
+            raise IllegalStateException("No Session to commit. You must begin a Session prior to cancelling")
+        self._session.cancel()
 
-	def rollback(self):
-		if not self._session:
-			raise IllegalStateException("No Session to rollback. You must begin a Session prior to rolling back one")
-		self._session.rollback()
-
-	
+    def rollback(self):
+        if not self._session:
+            raise IllegalStateException("No Session to rollback. You must begin a Session prior to rolling back one")
+        self._session.rollback()
