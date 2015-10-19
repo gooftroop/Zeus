@@ -41,19 +41,14 @@ imposing a hit to performance?
 
 @backend("Element")
 # Here we've defined the url root as '/atlas/api' in settings
-@root("/configuration/context/(?<context>[\w\d-]+){1}/.*/(.*)?")
+@url("/configuration/context/(?<context>[\w\d-]+){1}/.*/(.*)?")
 class Atlas(REST):
 
     @authorized
     def get(self, slug):
 
-        # TODO I'd like to hide the future/result content -- ideally the
-        # implementors. just code the backend access and we handle the rest
         # TODO implement load in Transactor
-        result = self.backend.load(self.model).get(slug, **self.parameters)
-        if is_future(result): # import is_future
-            result = yield result
-
+        result = self.capture(self.backend.load(self.model).get(slug, **self.parameters))
         self.respond(result)
 
 
@@ -68,6 +63,7 @@ class Login(REST):
 
     @authorized
     def post(self):
+        # TODO should we make request body arguments first-class attrs of the class?
         username = self.parameters["username"]
         password = self.parameters["password"]
         self.backend.User.login(username, password)
@@ -75,7 +71,6 @@ class Login(REST):
 """
 
 
-@BaseHandler.responsehandler(RESTResponseHandler)
 class REST(BaseHandler):
 
     def initialize(self):
@@ -101,36 +96,6 @@ class REST(BaseHandler):
     @property
     def parameters(self):
         return self.body_arguments
-
-    @abc.abstractmethod
-    def get(self, *args, **kwargs):
-        """
-        """
-
-    @abc.abstractmethod
-    def put(self, *args, **kwargs):
-        """
-        """
-
-    @abc.abstractmethod
-    def post(self, *args, **kwargs):
-        """
-        """
-
-    @abc.abstractmethod
-    def delete(self, *args, **kwargs):
-        """
-        """
-
-    @abc.abstractmethod
-    def head(self, *args, **kwargs):
-        """
-        """
-
-    @abc.abstractmethod
-    def options(self, *args, **kwargs):
-        """
-        """
 
 
 class RESTResponseHandler(ResponseHandler):

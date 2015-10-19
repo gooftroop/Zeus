@@ -11,6 +11,7 @@ import tornado.web as web
 import tornado.gen as gen
 import config.global_settings as settings
 
+from tornado.concurrent import is_future
 from lib.auth import is_authenticated
 from lib.error import (ImproperlyConfiguredException,
                        NotYetImplementedException,
@@ -306,6 +307,15 @@ class BaseHandler(web.RequestHandler):
     ###########################################################################
     # Functions
     ###########################################################################
+    
+    def capture(self, fn_ret):
+        """
+        """
+
+        result = fn_ret
+        if is_future(result): # import is_future
+            result = yield result
+        return result
 
    	# TODO set up basic HTTP Auth. Also sure that this could be better
     def get_current_user(self):
