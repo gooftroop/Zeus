@@ -34,23 +34,22 @@ imposing a hit to performance?
 
 --> allow pattern matching in the url
 
---> biggest question is...how does the server determine all the urls at 
-    startup? or does it even need to? can it do a search during a request? 
-    that might take a lot of changes to tornado...also slower too. so nope. 
+--> biggest question is...how does the server determine all the urls at
+    startup? or does it even need to? can it do a search during a request?
+    that might take a lot of changes to tornado...also slower too. so nope.
     back to the first question.
 
 @backend("Element")
-@root("/atlas/api")
+# Here we've defined the url root as '/atlas/api' in settings
+@root("/configuration/context/(?<context>[\w\d-]+){1}/.*/(.*)?")
 class Atlas(REST):
 
     @authorized
-    # The slug would be the last matching group, and then parameters would be
-    # dumped into kwargs iff they are named
-    @GET("/configuration/context/(?<context>[\w\d-]+){1}/.*/(.*)?")
     def get(self, slug):
 
         # TODO I'd like to hide the future/result content -- ideally the
         # implementors. just code the backend access and we handle the rest
+        # TODO implement load in Transactor
         result = self.backend.load(self.model).get(slug, **self.parameters)
         if is_future(result): # import is_future
             result = yield result
@@ -60,20 +59,21 @@ class Atlas(REST):
 
 @backend("SQL")
 @model("User") # TODO allow either class or function? Should load the Model
-@root("/atlas/api")
+# Here we've defined the url root as '/atlas/api' in settings
+@url("/login")
 class Login(REST):
 
-    @GET("/login")
     def get(self):
         # etc...
 
-    @POST("/login")
-    def login(self):
+    @authorized
+    def post(self):
         username = self.parameters["username"]
         password = self.parameters["password"]
-        # etc...
+        self.backend.User.login(username, password)
 
 """
+
 
 @BaseHandler.responsehandler(RESTResponseHandler)
 class REST(BaseHandler):
@@ -102,12 +102,41 @@ class REST(BaseHandler):
     def parameters(self):
         return self.body_arguments
 
+    @abc.abstractmethod
+    def get(self, *args, **kwargs):
+        """
+        """
+
+    @abc.abstractmethod
+    def put(self, *args, **kwargs):
+        """
+        """
+
+    @abc.abstractmethod
+    def post(self, *args, **kwargs):
+        """
+        """
+
+    @abc.abstractmethod
+    def delete(self, *args, **kwargs):
+        """
+        """
+
+    @abc.abstractmethod
+    def head(self, *args, **kwargs):
+        """
+        """
+
+    @abc.abstractmethod
+    def options(self, *args, **kwargs):
+        """
+        """
+
 
 class RESTResponseHandler(ResponseHandler):
 	"""
     """
 
-    @BaseHandler.responsefilter
     def respond(self, response=None):
         """
         :param response:

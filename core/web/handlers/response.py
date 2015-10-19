@@ -7,9 +7,26 @@ introducing a more clear architecture by defining distinct objects and their
 roles (separation-of-concern)
 """
 
+import abc
+import functools
+import logging
 from lib.error import IllegalArgumentException
 
+
+def responsefilter(method):
+    """
+    Call a while bunch of filters on the response before finishing?
+    """
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        # run filters
+        return method(self, *args, **kwargs)
+    return wrapper
+
+
 class ResponseHandler(object):
+
+    __metaclass__ = abc.ABCMeta
 
     logger = logging.getLogger("ef5")
 
@@ -35,9 +52,9 @@ class ResponseHandler(object):
         self.ctx.write(self.parse(response))
         self.ctx.finish()
 
-    @property
-    def status(self):
-        return self.ctx.get_status()
+    ###########################################################################
+    # Properties
+    ###########################################################################
 
     @property
     def headers(self):
@@ -60,25 +77,67 @@ class ResponseHandler(object):
         """
         self.ctx.clear_header(name)
 
+    @property
+    def status(self):
+        return self.ctx.get_status()
+
+    ###########################################################################
+    # Abstract Methods
+    ###########################################################################
+
+    @abc.abstractmethod
+    def canonicalize_data(self, data):
+        """
+        :param data:
+        :return:
+            The canonicalized dictionary
+        """
+
+    @abc.abstractmethod
+    def parse(self, data):
+        """
+        """
+
+    @abc.abstractmethod
+    def respond(self, *args, **kwargs):
+        """
+        """
+
+    ###########################################################################
+    # Functions
+    # Most of the following functions are simple proxies to
+    # Tornado.RequestHandler
+    ###########################################################################
+    #
     def clear(self):
         """
         """
         self.ctx.clear()
 
-    def set_default_headers(self):
+    def clear_all_cookies(self, **kwargs):
         """
         """
-        pass
+        self.ctx.clear_all_cookies(**kwargs)
 
-    def respond(self, *args, **kwargs):
+    def clear_cookies(self, name, **kwargs):
         """
         """
-        pass
+        self.ctx.clear_cookies(name, **kwargs)
 
-    def set_status(self, code, reason=None):
+    def get_cookie(self, name, default=None):
         """
         """
-        self.ctx.set_status(code, reason)
+        return self.ctx.get_cookie(name, default=default)
+
+    def get_secure_cookie(self, name, **kwargs):
+        """
+        """
+        return self.ctx.get_secure_cookie(name, **kwargs)
+
+    def get_secure_cookie_key_version(self, name, **kwargs):
+        """
+        """
+        return self.ctx.get_secure_cookie_key_version(name, **kwargs)
 
     def filter(self, response):
         """
@@ -90,16 +149,27 @@ class ResponseHandler(object):
         """
         pass
 
-    def canonicalize_data(self, data):
+    def redirect(self, url, permanent=False, status=None):
         """
-        :param data:
-        :return:
-            The canonicalized dictionary
         """
-        return data
+        self.ctx.redirect(url, permanent=permanent, status=status)
 
-    def parse(self, data):
+    def set_cookies(self, name, value, **kwargs):
         """
         """
+        self.ctx.set_cookies(name, value, **kwargs)
 
-        return data
+    def set_default_headers(self):
+        """
+        """
+        pass
+
+    def set_secure_cookie(self, name, value, **kwargs):
+        """
+        """
+        self.ctx.set_secure_cookie(name, value, **kwargs)
+
+    def set_status(self, code, reason=None):
+        """
+        """
+        self.ctx.set_status(code, reason)

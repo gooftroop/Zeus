@@ -3,6 +3,8 @@
 """
 """
 
+import abc
+import functools
 import traceback
 
 import tornado.web as web
@@ -10,14 +12,12 @@ import tornado.gen as gen
 import config.global_settings as settings
 
 from lib.auth import is_authenticated
-from lib.error import (
-						ImproperlyConfiguredException,
-						NotYetImplementedException,
-						IllegalArgumentException,
-						TransactorException,
-						DAOException,
-						ValidationException
-					  )
+from lib.error import (ImproperlyConfiguredException,
+                       NotYetImplementedException,
+                       IllegalArgumentException,
+                       TransactorException,
+                       DAOException,
+                       ValidationException)
 
 GET = "get"
 POST = "post"
@@ -37,7 +37,7 @@ FALLBACK_ERROR_MESSAGE = "An error occurred while processing your request. Pleas
 
 def authenticated(method):
     """
-   	@bwebb Pulled from Torando web.py to alter the behavior
+    @bwebb Pulled from Torando web.py to alter the behavior
     of auth failure to redirect if REDIRECT_LOGIN is true, error out
     otherwise, for all wrapped methods.
 
@@ -71,57 +71,72 @@ def authenticated(method):
     return wrapper
 
 
-def backend(original_class):
+def backend(backend):
     """
     Declare the backend to be used by the decorated class
+    Support either name, object, or function
     """
 
+    def wrapper(obj):
+        if inspect.isclass(obj):
+            obj._cls_backend = backend
+        else:
+            obj.backend = backend
+    return cls_wrapper
 
-def model(original_class):
+
+def model(model):
     """
-	Declare the model name to be used by the decorated class
+    Declare the model name to be used by the decorated class
+    Support either name, object, or function
     """
 
+    def wrapper(obj):
+        if inspect.isclass(obj):
+            obj._cls_model = model
+        else:
+            obj.model = model
+    return cls_wrapper
 
-def responsehandler(original_class):
+
+def response(handler):
 	"""
-	Declare the Response Handler object to be used with the class
-	"""
+    Declare the Response Handler object to be used with the class
+    Support either name, object, or function
+    """
+
+    def wrapper(obj):
+        if inspect.isclass(obj):
+            obj._cls_response = handler
+        else:
+            obj.response = handler
+    return cls_wrapper
 
 
 def validate(method):
 	"""
-	Ok, so....the user needs to define validation methods, right?
-	theres validation on the http request input, validation on the models, etc...
-	So how do I want to do this?
-	Maybe have them define validation callbacks to loop through for pre dao and post dao calls?
-	We keep validate and request filter separate just to refine intent on a request
-	"""
-	@functools.wraps(method)
-	def wrapper(self, *args, **kwargs):
+    Ok, so....the user needs to define validation methods, right?
+    theres validation on the http request input, validation on the models, etc...
+    So how do I want to do this?
+    Maybe have them define validation callbacks to loop through for pre dao and post dao calls?
+    We keep validate and request filter separate just to refine intent on a request
+    """
 
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        # run validation
         return method(self, *args, **kwargs)
     return wrapper
 
 
-def requestfilter(method):
+def filter(method):
 	"""
 	Call a whole bunch of filters on the request before da calls?
 	"""
+
 	@functools.wraps(method)
     def wrapper(self, *args, **kwargs):
-        
-        return method(self, *args, **kwargs)
-    return wrapper
-
-
-def responsefilter(method):
-	"""
-	Call a while bunch of filters on the response before finishing?
-	"""
-    @functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        
+        # run filters
         return method(self, *args, **kwargs)
     return wrapper
 
@@ -143,107 +158,76 @@ def catch(Catch, message=None):
 	    		raise BaseHandler.HTTPError(400, log_message=msg, reason=msg)
 
 
-def GET(url):
-	"""
-	Define a controller for a GET operation
-	"""
+def url(url):
+    """
+    Attach a url attribute to the class
+    TODO Ideally I'd like to define an 'on' callback (i.e. <something>.on("urls", url))
+    so that when an application spins up it will call this event and recieve all urls
+    defined in this manner. However, I'm going to need to create a event-based comm 
+    module that hooks into Tornado's IO for async events (non-async will need dict-
+    based impl). Until then, iimplementations creating Application objects will
+    need to reach into imported API classes, populate the urls, and pass it to the
+    Application instantiation
+    """
 
-	@functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        
-        return method(self, *args, **kwargs)
-    return wrapper
-
-
-def POST(url):
-	"""
-	Define a controller for a POST operation
-	"""
-
-	@functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        
-        return method(self, *args, **kwargs)
-    return wrapper
-
-
-def PUT(url):
-	"""
-	Define a controller for a PUT operation
-	"""
-
-	@functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        
-        return method(self, *args, **kwargs)
-    return wrapper
-
-
-def PATCH(url):
-	"""
-	Define a controller for a PATCH operation
-	"""
-
-	@functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        
-        return method(self, *args, **kwargs)
-    return wrapper
-
-
-def DELETE(url):
-	"""
-	Define a controller for a DELETE operation
-	"""
-
-	@functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        
-        return method(self, *args, **kwargs)
-    return wrapper
-
-
-def OPTIONS(url):
-	"""
-	Define a controller for a OPTIONS operation
-	"""
-
-	@functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        
-        return method(self, *args, **kwargs)
-    return wrapper
-
-
-def HEAD(url):
-	"""
-	Define a controller for a HEAD operation
-	"""
-
-	@functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        
-        return method(self, *args, **kwargs)
-    return wrapper
+    def cls_wrapper(cls):
+        cls._url = url
+    return cls_wrapper
 
 
 class BaseHandler(web.RequestHandler):
     """
     """
 
+    __metaclass__ = abc.ABCMeta
+
     logger = logging.getLogger("ef5")
-    _response = None
-    _backend = None
-    _response = None
+    _url = None
+    _cls_backend = None
+    _cls_model = None
+    _cls_response = None
 
     def initialize(self):
         """
         Do not override
         :return:
         """
+        self._backend = None
+         self._model = None
+        self._response = None
+
+        # Take advanntage of any logic in the setters
+        self.response = self._cls_response
+        self.backend = self._cls_backend
+        self.model = self._cls_model
+
         self.configure()
         if self.response is None:
         	raise ImproperlyConfiguredException("Missing response object")
+
+    @classmethod
+    def url(cls):
+        """
+        """
+        return cls._url
+
+    @classmethod
+    def default_backend(cls):
+        """
+        """
+        return cls._cls_backend
+
+    @classmethod
+    def default_model(cls):
+        """
+        """
+        return cls._cls_model
+
+    @classmethod
+    def default_response_handler(cls):
+        """
+        """
+        return cls._cls_response
 
     ###########################################################################
     # Properties
@@ -251,34 +235,77 @@ class BaseHandler(web.RequestHandler):
 
     @property
     def backend(self):
+        """
+        """
         return self._backend
 
     @backend.setter
     def backend(self, _backend):
+        """
+        """
     	if _backend is None:
     		raise IllegalArgumentException("backend cannot be empty")
+        # TODO if string, load
+        # if function, call
     	self._backend = _backend
 
     @property
+    def model(self):
+        return self._model
+
+    @model.setter
+    def model(self, model_name):
+        """
+        """
+        if _response is None:
+            raise IllegalArgumentException("model name cannot be empty")
+
+        if isinstance(model_name, tuple):
+            model_name = model_name[0]
+            rest = model_name[1]
+
+        if isinstance(model_name, basestring):
+            self._model = self._backend.load(model_name, **rest)
+        elif inspect.isfunction(model_name):
+            self._model = model_name(**rest)
+        else
+            self._model = model_name
+
+    @property
     def response(self):
+        """
+        """
         return self._response
     
     @response.setter
     def response(self, _response):
+        """
+        """
     	# TODO each response should inherit from a single Response Object
     	# check for that
+        # TODO if string, load
+        # if function, call 
     	if _response is None:
-    		raise IllegalArgumentException("reponse cannot be empty")
+    		raise IllegalArgumentException("response cannot be empty")
     	self._response = _response
+
+    ###########################################################################
+    # Abstract Methods
+    ###########################################################################
+    
+    @abc.abstractmethod    
+    def configure(self):
+        """
+        """
+
+    @abc.abstractmethod
+    def prepare(self):
+        """
+        """
 
     ###########################################################################
     # Functions
     ###########################################################################
-
-    def configure(self):
-    	"""
-    	"""
-    	pass
 
    	# TODO set up basic HTTP Auth. Also sure that this could be better
     def get_current_user(self):
@@ -297,27 +324,14 @@ class BaseHandler(web.RequestHandler):
 
             return user
 
-    def load_backend(self):
-    	"""
-    	"""
-
-    	# if backend is none, look for the backend in the running conf
-    	# otherwise, error out
-
-    	if self.backend is None:
-    		raise ImproperlyConfiguredException("Backend not set")
-
     def on_finish(self):
     	"""
     	"""
     	pass
 
-   	def prepare(self):
-        """
-        """
-        pass
-
     def respond(self, *args, **kwargs):
+        """
+        """
     	self.response._respond(*args, **kwargs)
 
     def write_error(self, status_code, **kwargs):
@@ -356,8 +370,3 @@ class BaseHandler(web.RequestHandler):
         data["title"] = kwargs.get("title", FALLBACK_ERROR_TITLE)
 
         self.response.respond(data)
-
-    def validate(self):
-    	"""
-    	"""
-    	pass
