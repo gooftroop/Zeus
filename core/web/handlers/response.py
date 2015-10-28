@@ -13,17 +13,6 @@ import logging
 from lib.error import IllegalArgumentException
 
 
-def responsefilter(method):
-    """
-    Call a while bunch of filters on the response before finishing?
-    """
-    @functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        # run filters
-        return method(self, *args, **kwargs)
-    return wrapper
-
-
 class ResponseHandler(object):
 
     __metaclass__ = abc.ABCMeta

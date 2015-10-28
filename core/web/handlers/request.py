@@ -114,34 +114,6 @@ def response(handler):
     return cls_wrapper
 
 
-def validate(method):
-	"""
-    Ok, so....the user needs to define validation methods, right?
-    theres validation on the http request input, validation on the models, etc...
-    So how do I want to do this?
-    Maybe have them define validation callbacks to loop through for pre dao and post dao calls?
-    We keep validate and request filter separate just to refine intent on a request
-    """
-
-    @functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        # run validation
-        return method(self, *args, **kwargs)
-    return wrapper
-
-
-def filter(method):
-	"""
-	Call a whole bunch of filters on the request before da calls?
-	"""
-
-	@functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        # run filters
-        return method(self, *args, **kwargs)
-    return wrapper
-
-
 def catch(Catch, message=None):
 	"""
 	Handle the defined exception

@@ -40,23 +40,32 @@ imposing a hit to performance?
     back to the first question.
 
 @backend("Element")
-# Here we've defined the url root as '/atlas/api' in settings
 @url("/configuration/context/(?<context>[\w\d-]+){1}/.*/(.*)?")
+# Here we've defined the url root as '/atlas/api' in settings
 class Atlas(REST):
+
+    def prepare(self):
+        # do stuff on the incoming request, like loading the appropriate model
 
     @authorized
     def get(self, slug):
 
         # TODO implement load in Transactor
-        result = self.capture(self.backend.load(self.model).get(slug, **self.parameters))
+        model = self.backend.load(self.model)
+        result = self.capture(model.get(slug, **self.parameters))
         self.respond(result)
+
+    ...etc.
 
 
 @backend("SQL")
 @model("User") # TODO allow either class or function? Should load the Model
-# Here we've defined the url root as '/atlas/api' in settings
 @url("/login")
+# Here we've defined the url root as '/atlas/api' in settings
 class Login(REST):
+
+    def prepare(self):
+        # do stuff on the incoming request...
 
     def get(self):
         # etc...
